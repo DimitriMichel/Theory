@@ -41,18 +41,55 @@ app.get("/waves", (request, response) => {
     .catch(err => console.error(err));
 });
 
-//Create post in Waves collection.
-app.post("/wave", (request, response) => {
+//Firebase Authentication Function
+const FBAuth = (request, response, next) => {
+  let idToken;
+  if (
+    request.headers.authorization &&
+    request.headers.authorization.startsWith("Bearer ")
+  ) {
+    //After split we taken the second element, the token.
+    idToken = request.headers.authorization.split("Bearer ")[1];
+  } else {
+    console.error("No token found.");
+    return response.status(403).json({ error: "Unauthorized." });
+  }
+  //Return goes to database to get user collection.
+  admin
+    .auth()
+    .verifyIdToken(idToken)
+    .then(decodedToken => {
+      request.user = decodedToken;
+      console.log(decodedToken);
+      return db
+        .collection("users")
+        .where("userId", "==", request.user.uid)
+        .limit(1)
+        .get();
+    })
+    // Promise returns docs property as an array. Gets ' handle: "user" ' property and attaches it to request.user
+    .then(data => {
+      request.user.handle = data.docs[0].data().handle;
+      return next();
+    })
+    .catch(err => {
+      console.error("Error while verifying token.", err);
+      return response.status(403).json(err);
+    });
+};
+//Create post.
+app.post("/wave", FBAuth, (request, response) => {
   if (request.method !== "POST") {
     return response.status(400).json({ error: "Method not allowed." });
   }
+
   const newWave = {
     body: request.body.body,
-    userHandle: request.body.userHandle,
-    createdAt: admin.firestore.Timestamp.fromDate(new Date())
+    userHandle: request.user.handle,
+    createdAt: new Date().toISOString()
   };
 
-  //Persist in database.
+  //Persist Wave in database.
   db.collection("waves")
     .add(newWave)
     .then(doc => {
@@ -64,6 +101,17 @@ app.post("/wave", (request, response) => {
     });
 });
 
+//Validation Helper Functions
+const isEmail = email => {
+  const emailRegEx = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  if (email.match(emailRegEx)) return true;
+  else return false;
+};
+const isEmpty = string => {
+  if (string.trim() === "") return true;
+  else return false;
+};
+
 //User Sign Up Route.
 app.post("/signup", (request, response) => {
   const newUser = {
@@ -72,8 +120,28 @@ app.post("/signup", (request, response) => {
     confirmPassword: request.body.confirmPassword,
     handle: request.body.handle
   };
+  // Validating email, password, and handle (username)
+  let errors = {};
+  if (isEmpty(newUser.email)) {
+    errors.email = "Must not be empty";
+  } else if (!isEmail(newUser.email)) {
+    errors.email = "Must be a valid e-mail address.";
+  }
+  if (isEmpty(newUser.password)) {
+    errors.password = "Must not be empty";
+  }
+  if (newUser.password !== newUser.confirmPassword) {
+    errors.confirmPassword = "Passwords must match.";
+  }
+  if (isEmpty(newUser.handle)) {
+    errors.handle = "Must not be empty";
+  }
+  if (Object.keys(errors).length > 0) {
+    return response.status(400).json(errors);
+  }
 
   // Validate Data
+  let token, userId;
   db.doc(`/users/${newUser.handle}`)
     .get()
     .then(doc => {
@@ -88,15 +156,60 @@ app.post("/signup", (request, response) => {
       }
     })
     .then(data => {
+      userId = data.user.uid;
       return data.user.getIdToken();
     })
-    .then(token => {
+    .then(idToken => {
+      token = idToken;
+      const userCredentials = {
+        handle: newUser.handle,
+        email: newUser.email,
+        createdAt: new Date().toISOString(),
+        userId
+      };
+      return db.doc(`/users/${newUser.handle}`).set(userCredentials);
+    })
+    .then(() => {
       return response.status(201).json({ token });
     })
     .catch(err => {
       console.error(err);
-      if (err.code === "auth/email-already-in-use")
+      if (err.code === "auth/email-already-in-use") {
+        return response
+          .status(400)
+          .json({ email: "E-mail is already in use." });
+      }
       return response.status(500).json({ error: err.code });
+    });
+});
+
+//User log-in route.
+app.post("/login", (request, response) => {
+  const user = {
+    email: request.body.email,
+    password: request.body.password
+  };
+  let errors = {};
+  if (isEmpty(user.email)) errors.email = "Must not be empty";
+  if (isEmpty(user.password)) errors.password = "Must not be empty";
+  if (Object.keys(errors).length > 0) return response.status(400).json(errors);
+
+  firebase
+    .auth()
+    .signInWithEmailAndPassword(user.email, user.password)
+    .then(data => {
+      return data.user.getIdToken();
+    })
+    .then(token => {
+      return response.json({ token });
+    })
+    .catch(err => {
+      console.error(err);
+      if (err.code === "auth/wrong-password") {
+        return response
+          .status(403)
+          .json({ general: "Wrong credentials, please try again." });
+      } else return response.status(500).json({ error: err.code });
     });
 });
 
