@@ -1,5 +1,5 @@
 let db = {
-  screams: [
+  waves: [
     {
       userHandle: "user",
       body: "wave body",
