@@ -1,3 +1,4 @@
+//Firebase Configurations
 module.exports = {
   apiKey: "AIzaSyBbqVc8GnWggwxu3GDykViihzjsZ_Ad1z0",
   authDomain: "theory-35917.firebaseapp.com",

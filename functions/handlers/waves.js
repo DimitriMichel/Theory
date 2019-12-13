@@ -1,8 +1,9 @@
 const { db } = require("../util/admin");
 
+// Get All Waves Function
 exports.getAllWaves = (request, response) => {
   db.collection("waves")
-    .orderBy('createdAt', 'desc')
+    .orderBy("createdAt", "desc")
     .get()
     .then(data => {
       let waves = [];
@@ -21,6 +22,7 @@ exports.getAllWaves = (request, response) => {
     .catch(err => console.error(err));
 };
 
+// Create Wave Function
 exports.createWave = (request, response) => {
   if (request.method !== "POST") {
     return response.status(400).json({ error: "Method not allowed." });

@@ -1,5 +1,6 @@
 const { admin, db } = require("./admin");
 
+// Authentication Token Function
 module.exports = (request, response, next) => {
   let idToken;
   if (
@@ -12,6 +13,7 @@ module.exports = (request, response, next) => {
     console.error("No token found.");
     return response.status(403).json({ error: "Unauthorized." });
   }
+
   //Return goes to database to get user collection.
   admin
     .auth()
@@ -25,6 +27,7 @@ module.exports = (request, response, next) => {
         .limit(1)
         .get();
     })
+
     // Promise returns docs property as an array. Gets ' handle: "user" ' property and attaches it to request.user
     .then(data => {
       request.user.handle = data.docs[0].data().handle;

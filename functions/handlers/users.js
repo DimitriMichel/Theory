@@ -2,8 +2,13 @@ const { db, admin } = require("../util/admin");
 const firebase = require("firebase");
 const config = require("../util/config");
 firebase.initializeApp(config);
-const { validateSignupData, validateLogindata } = require("../util/validators");
+const {
+  validateSignupData,
+  validateLoginData,
+  reduceUserDetails
+} = require("../util/validators");
 
+// User Sign Up Function.
 exports.signup = (request, response) => {
   const newUser = {
     email: request.body.email,
@@ -12,7 +17,7 @@ exports.signup = (request, response) => {
     handle: request.body.handle
   };
 
-  //Destructuring errors and validation in User Sign Up data
+  //Destructuring errors and validation in User Sign Up data.
   const { valid, errors } = validateSignupData(newUser);
   if (!valid) return response.status(400).json(errors);
 
@@ -62,6 +67,7 @@ exports.signup = (request, response) => {
     });
 };
 
+//Login User Function.
 exports.login = (request, response) => {
   const user = {
     email: request.body.email,
@@ -69,7 +75,7 @@ exports.login = (request, response) => {
   };
 
   //Destructuring errors and validation in User Login data
-  const { valid, errors } = validateLogindata(user);
+  const { valid, errors } = validateLoginData(user);
   if (!valid) return response.status(400).json(errors);
 
   firebase
@@ -91,6 +97,44 @@ exports.login = (request, response) => {
     });
 };
 
+// Add User Details Function.
+exports.addUserDetails = (request, response) => {
+  let userDetails = reduceUserDetails(request.body);
+  db.doc(`/users/${request.user.handle}`)
+    .update(userDetails)
+    .then(() => {
+      return response.json({ message: "Details Added." });
+    })
+    .catch(err => {
+      console.error(err);
+      return response.status(500).json({ error: err.code });
+    });
+};
+
+///Get User Details Function
+exports.getAuthenticatedUser = (request, response) => {
+  let userData = {};
+  db.doc(`/users/${request.user.handle}`).get()
+      .then(doc => {
+        if (doc.exists){
+          userData.credentials = doc.data();
+          return db.collection("likes").where("userHandle", "==", request.user.handle).get()
+        }
+      })
+      .then(data => {
+        userData.likes = [];
+        data.forEach((doc) => {
+          userData.likes.push(doc.data());
+        });
+        return response.json({userData});
+      })
+      .catch(err =>{
+        console.error(err);
+        return response.status(500).json({error: err.code})
+      })
+};
+
+//Upload Profile Picture Function (w/ BusBoy --> https://github.com/mscdex/busboy#readme ).
 exports.uploadImage = (request, response) => {
   const BusBoy = require("busboy");
   const path = require("path");
@@ -98,6 +142,8 @@ exports.uploadImage = (request, response) => {
   const fs = require("fs");
   let imageFilename;
   let imageToBeUploaded = {};
+
+  //Making sure only image file types are to be uploaded.
   const busboy = new BusBoy({ headers: request.headers });
   busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
     if (mimetype !== "image/jpeg" && mimetype !== "image/png") {
@@ -116,6 +162,8 @@ exports.uploadImage = (request, response) => {
     imageToBeUploaded = { filepath, mimetype };
     file.pipe(fs.createWriteStream(filepath));
   });
+
+  //image sent to firebase storage bucket.
   busboy.on("finish", () => {
     admin
       .storage()
