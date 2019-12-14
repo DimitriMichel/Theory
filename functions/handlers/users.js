@@ -63,7 +63,9 @@ exports.signup = (request, response) => {
           .status(400)
           .json({ email: "E-mail is already in use." });
       }
-      return response.status(500).json({ error: err.code });
+      return response
+        .status(500)
+        .json({ general: "Something went wrong.. Try Again." });
     });
 };
 
@@ -89,11 +91,9 @@ exports.login = (request, response) => {
     })
     .catch(err => {
       console.error(err);
-      if (err.code === "auth/wrong-password") {
-        return response
-          .status(403)
-          .json({ general: "Wrong credentials, please try again." });
-      } else return response.status(500).json({ error: err.code });
+      return response
+        .status(403)
+        .json({ general: "Wrong credentials, please try again." });
     });
 };
 
@@ -111,27 +111,89 @@ exports.addUserDetails = (request, response) => {
     });
 };
 
-///Get User Details Function
+//Get User Details Function.
+exports.getUserDetails = (request, response) => {
+  let userData = {};
+  db.doc(`/users/${request.params.handle}`)
+    .get()
+    .then(doc => {
+      if (doc.exists) {
+        userData.user = doc.data();
+        return db
+          .collection("waves")
+          .where("userHandle", "==", request.params.handle)
+          .orderBy("createdAt", "desc")
+          .get();
+      } else {
+        return response.json({ error: "User not found." });
+      }
+    })
+    .then(data => {
+      userData.waves = [];
+      data.forEach(doc => {
+        userData.waves.push({
+          body: doc.data().body,
+          createdAt: doc.data().createdAt,
+          userHandle: doc.data().userHandle,
+          userImage: doc.data().userImage,
+          likeCount: doc.data().likeCount,
+          commentCount: doc.data().commentCount,
+          waveID: doc.id
+        });
+      });
+      return response.json(userData);
+    })
+    .catch(err => {
+      console.error(err);
+      return response.status(500).json({ error: err.code });
+    });
+};
+
+///Get User Details Function.
 exports.getAuthenticatedUser = (request, response) => {
   let userData = {};
-  db.doc(`/users/${request.user.handle}`).get()
-      .then(doc => {
-        if (doc.exists){
-          userData.credentials = doc.data();
-          return db.collection("likes").where("userHandle", "==", request.user.handle).get()
-        }
-      })
-      .then(data => {
-        userData.likes = [];
-        data.forEach((doc) => {
-          userData.likes.push(doc.data());
+  db.doc(`/users/${request.user.handle}`)
+    .get()
+    .then(doc => {
+      if (doc.exists) {
+        userData.credentials = doc.data();
+        return db
+          .collection("likes")
+          .where("userHandle", "==", request.user.handle)
+          .get();
+      }
+    })
+    .then(data => {
+      userData.likes = [];
+      data.forEach(doc => {
+        userData.likes.push(doc.data());
+      });
+      return db
+        .collection("notifications")
+        .where("recipient", "==", request.user.handle)
+        .orderBy("createdAt", "desc")
+        .limit(10)
+        .get();
+    })
+    .then(data => {
+      userData.notifications = [];
+      data.forEach(doc => {
+        userData.notifications.push({
+          recipient: doc.data().recipient,
+          sender: doc.data().sender,
+          createdAt: doc.data().createdAt,
+          waveID: doc.data().waveID,
+          type: doc.data().type,
+          read: doc.data().read,
+          notificationID: doc.id
         });
-        return response.json({userData});
-      })
-      .catch(err =>{
-        console.error(err);
-        return response.status(500).json({error: err.code})
-      })
+      });
+      return response.json(userData);
+    })
+    .catch(err => {
+      console.error(err);
+      return response.status(500).json({ error: err.code });
+    });
 };
 
 //Upload Profile Picture Function (w/ BusBoy --> https://github.com/mscdex/busboy#readme ).
@@ -189,4 +251,22 @@ exports.uploadImage = (request, response) => {
       });
   });
   busboy.end(request.rawBody);
+};
+//Mark Notifications as "Read" Function.
+exports.markNotificationsRead = (request, response) => {
+  //Batch Write (update multiple firebase docs)
+  let batch = db.batch();
+  request.body.forEach(notificationID => {
+    const notification = db.doc(`/notifications/${notificationID}`);
+    batch.update(notification, { read: true });
+  });
+  batch
+    .commit()
+    .then(() => {
+      return response.json({ message: "Notification marked as read." });
+    })
+    .catch(err => {
+      console.error(err);
+      return response.status(500).json({ error: err.code });
+    });
 };

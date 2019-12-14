@@ -29,6 +29,16 @@ let db = {
       bode: "Oh..It's ruined :~) nice work.",
       createdAt: "2019-12-11T07:57:13.221Z"
     }
+  ],
+  notifications: [
+    {
+      recipient: "user",
+      sender: "john",
+      read: "true || false",
+      waveID: "aK3gVJasIlVqtXQj7UCp",
+      type: "like || comment",
+      createdAt: "2019-12-13T10:14:42.264Z"
+    }
   ]
 };
 
