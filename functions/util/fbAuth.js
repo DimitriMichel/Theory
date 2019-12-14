@@ -29,8 +29,10 @@ module.exports = (request, response, next) => {
     })
 
     // Promise returns docs property as an array. Gets ' handle: "user" ' property and attaches it to request.user
-    .then(data => {
+    // Promise returns docs property as an array. Gets ' imageUrl: "user" ' property and attaches it to request.user
+      .then(data => {
       request.user.handle = data.docs[0].data().handle;
+      request.user.imageUrl = data.docs[0].data().imageUrl;
       return next();
     })
     .catch(err => {

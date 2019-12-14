@@ -21,6 +21,14 @@ let db = {
       likeCount: 20,
       commentCount: 8
     }
+  ],
+  comments: [
+    {
+      userHandle: "user",
+      waveID: "30FEYER3AZ2y7ndCEzJF",
+      bode: "Oh..It's ruined :~) nice work.",
+      createdAt: "2019-12-11T07:57:13.221Z"
+    }
   ]
 };
 
