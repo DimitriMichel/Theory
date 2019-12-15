@@ -52,10 +52,14 @@ exports.createNotificationOnLike = functions
   .firestore.document("likes/{id}")
   //"snapshot" is wave.ID's corresponding like.
   .onCreate(snapshot => {
-    db.doc(`/waves/${snapshot.data().waveID}`)
+    return db
+      .doc(`/waves/${snapshot.data().waveID}`)
       .get()
       .then(doc => {
-        if (doc.exists) {
+        if (
+          doc.exists &&
+          doc.data().userHandle !== snapshot.data().userHandle
+        ) {
           return db.doc(`/notifications/${snapshot.id}`).set({
             createAt: new Date().toISOString(),
             recipient: doc.data().userHandle,
@@ -66,28 +70,20 @@ exports.createNotificationOnLike = functions
           });
         }
       })
-      // No JSON response needed for database trigger.
-      .then(() => {
-        return;
-      })
       .catch(err => {
         console.error(err);
-        return;
       });
   });
-
+//Delete Notifications Function.
 exports.deleteNotificationOnUnlike = functions
   .region("us-east1")
   .firestore.document("likes/{id}")
   .onDelete(snapshot => {
-    db.doc(`/notifications/${snapshot.id}`)
+    return db
+      .doc(`/notifications/${snapshot.id}`)
       .delete()
-      .then(() => {
-        return;
-      })
       .catch(err => {
         console.error(err);
-        return;
       });
   });
 
@@ -116,6 +112,68 @@ exports.createNotificationOnComment = functions
       })
       .catch(err => {
         console.error(err);
-        return;
       });
+  });
+
+//Change Global User Image Function
+exports.onUserImageChange = functions
+  .region("us-east1")
+  .firestore.document("/users/{userId}")
+  .onUpdate(change => {
+    console.log(change.before.data());
+    console.log(change.after.data());
+    if (change.before.data().imageUrl !== change.after.data().imageUrl) {
+      console.log("image has changed");
+      const batch = db.batch();
+      return db
+        .collection("waves")
+        .where("userHandle", "==", change.before.data().handle)
+        .get()
+        .then(data => {
+          data.forEach(doc => {
+            const wave = db.doc(`/waves/${doc.id}`);
+            batch.update(wave, { userImage: change.after.data().imageUrl });
+          });
+          return batch.commit();
+        });
+    } else {
+      return true;
+    }
+  });
+//Delete child comments and likes on Parent Wave delete Function.
+exports.onWaveDelete = functions
+  .region("us-east1")
+  .firestore.document("/waves/{waveID}")
+  .onDelete((snapshot, context) => {
+    const waveID = context.params.waveID;
+    const batch = db.batch();
+    return db
+      .collection("comments")
+      .where("waveID", "==", waveID)
+      .get()
+      .then(data => {
+        data.forEach(doc => {
+          batch.delete(db.doc(`/comments/${doc.id}`));
+        });
+        return db
+          .collection("likes")
+          .where("waveID", "==", waveID)
+          .get();
+      })
+      .then(data => {
+        data.forEach(doc => {
+          batch.delete(db.doc(`/likes/${doc.id}`));
+        });
+        return db
+          .collection("notifications")
+          .where("waveID", "==", waveID)
+          .get();
+      })
+      .then(data => {
+        data.forEach(doc => {
+          batch.delete(db.doc(`/notifications/${doc.id}`));
+        });
+        return batch.commit();
+      })
+      .catch(err => console.error(err));
   });

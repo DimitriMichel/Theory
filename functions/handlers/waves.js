@@ -13,6 +13,7 @@ exports.getAllWaves = (request, response) => {
           body: doc.data().body,
           userHandle: doc.data().userHandle,
           createdAt: doc.data().createdAt,
+          userImage: doc.data().userImage,
           commentCount: doc.data().commentCount,
           likeCount: doc.data().likeCount
         });
@@ -25,7 +26,7 @@ exports.getAllWaves = (request, response) => {
 // Create Wave Function
 exports.createWave = (request, response) => {
   if (request.body.body.trim() === "") {
-    return response.status(400).json({ body: "Must not be empty." });
+    return response.status(400).json({ comment: "Must not be empty." });
   }
   if (request.method !== "POST") {
     return response.status(400).json({ error: "Method not allowed." });
