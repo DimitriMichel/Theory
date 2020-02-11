@@ -114,6 +114,7 @@ exports.addUserDetails = (request, response) => {
 //Get User Details Function.
 exports.getUserDetails = (request, response) => {
   let userData = {};
+  //Ask users document for user handle
   db.doc(`/users/${request.params.handle}`)
     .get()
     .then(doc => {

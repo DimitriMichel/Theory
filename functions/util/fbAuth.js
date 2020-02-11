@@ -21,6 +21,7 @@ module.exports = (request, response, next) => {
     .then(decodedToken => {
       request.user = decodedToken;
       console.log(decodedToken);
+
       return db
         .collection("users")
         .where("userId", "==", request.user.uid)
@@ -28,12 +29,16 @@ module.exports = (request, response, next) => {
         .get();
     })
 
-    // Promise returns docs property as an array. Gets ' handle: "user" ' property and attaches it to request.user
-    // Promise returns docs property as an array. Gets ' imageUrl: "user" ' property and attaches it to request.user
-      .then(data => {
-      request.user.handle = data.docs[0].data().handle;
+    .then(data => {
+      if (data) {
+        console.log(data.docs);
+        request.user.handle = data.docs[0].data().handle;
+        request.user.imageUrl = data.docs[0].data().imageUrl;
+        return next();
+      }
+      /*request.user.handle = data.docs[0].data().handle;
       request.user.imageUrl = data.docs[0].data().imageUrl;
-      return next();
+      return next();*/
     })
     .catch(err => {
       console.error("Error while verifying token.", err);
