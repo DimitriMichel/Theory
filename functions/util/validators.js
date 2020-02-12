@@ -42,7 +42,7 @@ exports.validateLoginData = data => {
     valid: Object.keys(errors).length === 0 ? true : false
   };
 };
-//Make sure our app does not send an empty string to database if user has not entered a detail.
+//Make sure app does not send an empty string to database if user has not entered a detail.
 exports.reduceUserDetails = (data) => {
   let userDetails = {};
   if(!isEmpty(data.bio.trim())){

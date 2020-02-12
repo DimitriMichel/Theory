@@ -111,12 +111,13 @@ exports.commentOnWave = (request, response) => {
     .then(() => {
       return db.collection("comments").add(newComment);
     })
+    //Return New Comment
     .then(() => {
-      response.json();
+      response.json(newComment);
     })
     .catch(err => {
       console.log(err);
-      respose.status(500).json({ error: "Something went wrong.." });
+      response.status(500).json({ error: "Something went wrong.." });
     });
 };
 
